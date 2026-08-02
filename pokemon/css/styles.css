@@ -8,6 +8,7 @@
   --muted: #667085;
   --success: #157347;
   --danger: #b42318;
+  --warning: #9a6700;
 }
 
 * { box-sizing: border-box; }
@@ -55,12 +56,13 @@ button { cursor: pointer; }
 .type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
 .type-button { min-height: 3rem; border: 1px solid var(--border); border-radius: .5rem; background: #fff; }
 .type-button[aria-pressed="true"] { outline: 3px solid var(--accent); }
-.type-button.correct { border-color: var(--success); }
-.type-button.incorrect { border-color: var(--danger); }
+.type-button.correct { border-color: var(--success); background: #ecfdf3; }
+.type-button.missed { border-color: var(--warning); background: #fffaeb; }
+.type-button.incorrect { border-color: var(--danger); background: #fef3f2; }
 .actions { display: flex; gap: .75rem; margin-top: 1rem; }
 .actions button { min-height: 2.75rem; padding: 0 1rem; }
-.feedback { margin-top: 1rem; padding: .75rem; border-left: .25rem solid var(--border); }
-.feedback.correct { border-color: var(--success); }
-.feedback.incorrect { border-color: var(--danger); }
+.feedback { margin-top: 1rem; padding: .75rem; border-left: .25rem solid var(--accent); }
+.feedback h4 { margin: 0 0 .5rem; }
+.feedback p { margin: .35rem 0; }
 
 @media (min-width: 36rem) { .type-grid { grid-template-columns: repeat(6, 1fr); } }
