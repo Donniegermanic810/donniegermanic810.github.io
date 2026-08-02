@@ -9,6 +9,7 @@ import {
   getSessionAverageScore,
   getAverageScore
 } from './state.js';
+import { saveSettings, saveProgress } from './storage.js';
 import { createQuestionForMode, QUIZ_MODES } from './quiz/modes.js';
 import { scoreQuestion } from './quiz/scoring.js';
 import { renderAnswerDisplay } from './quiz/displays.js';
@@ -39,6 +40,7 @@ function createNextQuestion() {
 
 function beginSession(length, render) {
   startQuizSession(length);
+  saveSettings(state.settings);
   createNextQuestion();
   render();
 }
@@ -83,6 +85,7 @@ function renderQuizSetup(page, render) {
   modeSelect.addEventListener('change', () => {
     state.quiz.mode = modeSelect.value;
     state.settings.quizMode = modeSelect.value;
+    saveSettings(state.settings);
   });
   modeLabel.append(modeSelect);
   form.append(modeLabel);
@@ -98,6 +101,10 @@ function renderQuizSetup(page, render) {
     option.selected = length === state.settings.quizLength;
     lengthSelect.append(option);
   }
+  lengthSelect.addEventListener('change', () => {
+    state.settings.quizLength = Number(lengthSelect.value);
+    saveSettings(state.settings);
+  });
   lengthLabel.append(lengthSelect);
   form.append(lengthLabel);
 
@@ -149,6 +156,7 @@ function renderActiveQuestion(page, render) {
       state.quiz.result = result;
       state.quiz.status = 'answered';
       recordQuestionResult(question, result);
+      saveProgress(state.progress);
       render();
     });
     actions.append(submit);
@@ -231,7 +239,11 @@ export const VIEWS = {
   progress: container => renderPlaceholder(
     container,
     'Progress',
-    `Answered since loading the app: ${state.progress.totalAnswered}. Average score: ${formatPercent(getAverageScore())}.`
+    `Saved questions answered: ${state.progress.totalAnswered}. Average score: ${formatPercent(getAverageScore())}.`
   ),
-  settings: container => renderPlaceholder(container, 'Settings', 'Persistent quiz and display settings will live here.')
+  settings: container => renderPlaceholder(
+    container,
+    'Settings',
+    `Saved preferences are active. Theme preference: ${state.settings.theme}.`
+  )
 };
