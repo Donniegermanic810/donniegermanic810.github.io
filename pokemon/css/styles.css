@@ -1,0 +1,66 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #1f2933;
+  background: #f7f7f8;
+  --surface: #fff;
+  --border: #d0d5dd;
+  --accent: #364fc7;
+  --muted: #667085;
+  --success: #157347;
+  --danger: #b42318;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, select { font: inherit; }
+button { cursor: pointer; }
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  max-width: 48rem;
+  margin: 0 auto;
+  background: var(--surface);
+}
+
+.app-header, .page, .app-nav { padding: 1rem; }
+.app-header { border-bottom: 1px solid var(--border); }
+.app-header h1 { margin: 0; font-size: 1.25rem; }
+.page h2 { margin-top: 0; }
+.muted { color: var(--muted); }
+.panel { border: 1px solid var(--border); border-radius: .75rem; padding: 1rem; }
+
+.app-nav {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .5rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.app-nav a {
+  text-align: center;
+  text-decoration: none;
+  color: inherit;
+  padding: .75rem .25rem;
+  border-radius: .5rem;
+}
+.app-nav a[aria-current="page"] { background: #eef2ff; color: var(--accent); font-weight: 700; }
+
+.quiz-toolbar { display: flex; gap: .75rem; align-items: end; flex-wrap: wrap; margin-bottom: 1rem; }
+.quiz-toolbar label { display: grid; gap: .25rem; }
+.type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+.type-button { min-height: 3rem; border: 1px solid var(--border); border-radius: .5rem; background: #fff; }
+.type-button[aria-pressed="true"] { outline: 3px solid var(--accent); }
+.type-button.correct { border-color: var(--success); }
+.type-button.incorrect { border-color: var(--danger); }
+.actions { display: flex; gap: .75rem; margin-top: 1rem; }
+.actions button { min-height: 2.75rem; padding: 0 1rem; }
+.feedback { margin-top: 1rem; padding: .75rem; border-left: .25rem solid var(--border); }
+.feedback.correct { border-color: var(--success); }
+.feedback.incorrect { border-color: var(--danger); }
+
+@media (min-width: 36rem) { .type-grid { grid-template-columns: repeat(6, 1fr); } }
