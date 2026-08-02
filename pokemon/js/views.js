@@ -1,6 +1,7 @@
 import { TYPE_META } from './data/types.js';
 import {
   state,
+  getQuizModeSettings,
   startQuizSession,
   recordQuestionResult,
   advanceQuizSession,
@@ -32,7 +33,7 @@ function formatTypes(types) {
 }
 
 function createNextQuestion() {
-  state.quiz.question = createQuestionForMode(state.quiz.mode);
+  state.quiz.question = createQuestionForMode(state.quiz.session.mode);
   state.quiz.selectedAnswers = new Set();
   state.quiz.result = null;
   state.quiz.status = 'answering';
@@ -67,7 +68,7 @@ function renderFeedback(result, question) {
 function renderQuizSetup(page, render) {
   const panel = el('div', { className: 'panel' });
   panel.append(el('p', {
-    text: 'This quiz currently uses one offensive weakness generator. The session system is ready to support additional generators later.'
+    text: 'This quiz currently uses one offensive weakness generator. Each quiz type now keeps its own saved setup.'
   }));
 
   const form = el('div', { className: 'quiz-setup' });
@@ -82,11 +83,6 @@ function renderQuizSetup(page, render) {
     option.selected = mode.id === state.quiz.mode;
     modeSelect.append(option);
   }
-  modeSelect.addEventListener('change', () => {
-    state.quiz.mode = modeSelect.value;
-    state.settings.quizMode = modeSelect.value;
-    saveSettings(state.settings);
-  });
   modeLabel.append(modeSelect);
   form.append(modeLabel);
 
@@ -94,17 +90,34 @@ function renderQuizSetup(page, render) {
   lengthLabel.append(el('span', { text: 'Questions' }));
   const lengthSelect = el('select');
   const lengths = [5, 10, 20, 0];
-  for (const length of lengths) {
-    const option = document.createElement('option');
-    option.value = String(length);
-    option.textContent = length === 0 ? 'Endless' : String(length);
-    option.selected = length === state.settings.quizLength;
-    lengthSelect.append(option);
+
+  function populateLengthOptions() {
+    const modeSettings = getQuizModeSettings(state.quiz.mode);
+    lengthSelect.replaceChildren();
+    for (const length of lengths) {
+      const option = document.createElement('option');
+      option.value = String(length);
+      option.textContent = length === 0 ? 'Endless' : String(length);
+      option.selected = length === modeSettings.questionCount;
+      lengthSelect.append(option);
+    }
   }
-  lengthSelect.addEventListener('change', () => {
-    state.settings.quizLength = Number(lengthSelect.value);
+
+  populateLengthOptions();
+
+  modeSelect.addEventListener('change', () => {
+    state.quiz.mode = modeSelect.value;
+    state.settings.quiz.defaultMode = modeSelect.value;
+    getQuizModeSettings(modeSelect.value);
+    populateLengthOptions();
     saveSettings(state.settings);
   });
+
+  lengthSelect.addEventListener('change', () => {
+    getQuizModeSettings(state.quiz.mode).questionCount = Number(lengthSelect.value);
+    saveSettings(state.settings);
+  });
+
   lengthLabel.append(lengthSelect);
   form.append(lengthLabel);
 
@@ -244,6 +257,6 @@ export const VIEWS = {
   settings: container => renderPlaceholder(
     container,
     'Settings',
-    `Saved preferences are active. Theme preference: ${state.settings.theme}.`
+    `Saved preferences are active. Theme preference: ${state.settings.theme}. Default quiz type: ${state.settings.quiz.defaultMode}.`
   )
 };
