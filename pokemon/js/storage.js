@@ -1,12 +1,19 @@
 const STORAGE_KEY = 'pokemon-type-trainer';
-export const STORAGE_VERSION = 1;
+export const STORAGE_VERSION = 2;
 
 export const DEFAULT_PERSISTENT_DATA = Object.freeze({
   version: STORAGE_VERSION,
   settings: {
     theme: 'system',
-    quizMode: 'select-all',
-    quizLength: 10
+    quiz: {
+      defaultMode: 'select-all',
+      common: {},
+      modes: {
+        'select-all': {
+          questionCount: 10
+        }
+      }
+    }
   },
   progress: {
     totalAnswered: 0,
@@ -26,17 +33,50 @@ function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function normalizeQuestionCount(value, fallback = 10) {
+  return new Set([5, 10, 20, 0]).has(value) ? value : fallback;
+}
+
+function normalizeModeSettings(value, fallback = {}) {
+  const normalized = isObject(value) ? { ...value } : {};
+  normalized.questionCount = normalizeQuestionCount(
+    normalized.questionCount,
+    normalizeQuestionCount(fallback.questionCount, 10)
+  );
+  return normalized;
+}
+
 function normalizeSettings(value) {
   const defaults = cloneDefaults().settings;
   if (!isObject(value)) return defaults;
 
   const validThemes = new Set(['system', 'light', 'dark']);
-  const validLengths = new Set([5, 10, 20, 0]);
+  const quiz = isObject(value.quiz) ? value.quiz : {};
+  const defaultMode = typeof quiz.defaultMode === 'string'
+    ? quiz.defaultMode
+    : defaults.quiz.defaultMode;
+  const rawModes = isObject(quiz.modes) ? quiz.modes : {};
+  const modeIds = new Set([
+    ...Object.keys(defaults.quiz.modes),
+    ...Object.keys(rawModes),
+    defaultMode
+  ]);
+  const modes = {};
+
+  for (const modeId of modeIds) {
+    modes[modeId] = normalizeModeSettings(
+      rawModes[modeId],
+      defaults.quiz.modes[modeId] ?? defaults.quiz.modes['select-all']
+    );
+  }
 
   return {
     theme: validThemes.has(value.theme) ? value.theme : defaults.theme,
-    quizMode: typeof value.quizMode === 'string' ? value.quizMode : defaults.quizMode,
-    quizLength: validLengths.has(value.quizLength) ? value.quizLength : defaults.quizLength
+    quiz: {
+      defaultMode,
+      common: isObject(quiz.common) ? { ...quiz.common } : {},
+      modes
+    }
   };
 }
 
@@ -64,6 +104,31 @@ function normalizeCache(value) {
   };
 }
 
+function migrateV1(raw) {
+  const defaults = cloneDefaults();
+  const oldSettings = isObject(raw.settings) ? raw.settings : {};
+  const oldMode = typeof oldSettings.quizMode === 'string'
+    ? oldSettings.quizMode
+    : defaults.settings.quiz.defaultMode;
+  const oldLength = normalizeQuestionCount(oldSettings.quizLength, 10);
+
+  return {
+    version: STORAGE_VERSION,
+    settings: normalizeSettings({
+      theme: oldSettings.theme,
+      quiz: {
+        defaultMode: oldMode,
+        common: {},
+        modes: {
+          [oldMode]: { questionCount: oldLength }
+        }
+      }
+    }),
+    progress: normalizeProgress(raw.progress),
+    cache: normalizeCache(raw.cache)
+  };
+}
+
 function migrate(raw) {
   if (!isObject(raw)) return cloneDefaults();
 
@@ -76,7 +141,8 @@ function migrate(raw) {
     };
   }
 
-  // Future versions can add explicit migration steps here.
+  if (raw.version === 1) return migrateV1(raw);
+
   return cloneDefaults();
 }
 
@@ -84,7 +150,9 @@ export function loadPersistentData() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return cloneDefaults();
-    return migrate(JSON.parse(raw));
+    const migrated = migrate(JSON.parse(raw));
+    write(migrated);
+    return migrated;
   } catch (error) {
     console.warn('Could not load saved data. Using defaults.', error);
     return cloneDefaults();
