@@ -14,15 +14,42 @@ export const state = {
     }
   },
   settings: {
+    theme: 'system',
     quizMode: 'select-all',
     quizLength: 10
   },
   study: { selectedType: null },
   progress: {
     totalAnswered: 0,
-    totalScore: 0
+    totalScore: 0,
+    relationshipStats: {}
+  },
+  cache: {
+    pokemon: {}
   }
 };
+
+export function hydratePersistentState(persistentData) {
+  state.settings = { ...state.settings, ...persistentData.settings };
+  state.progress = { ...state.progress, ...persistentData.progress };
+  state.cache = { ...state.cache, ...persistentData.cache };
+
+  state.quiz.mode = state.settings.quizMode;
+  state.quiz.session.length = state.settings.quizLength;
+}
+
+export function getPersistentSnapshot() {
+  return {
+    settings: { ...state.settings },
+    progress: {
+      ...state.progress,
+      relationshipStats: { ...state.progress.relationshipStats }
+    },
+    cache: {
+      pokemon: { ...state.cache.pokemon }
+    }
+  };
+}
 
 export function resetQuestionState() {
   state.quiz.selectedAnswers = new Set();
