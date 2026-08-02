@@ -15,6 +15,7 @@
 body { margin: 0; }
 button, select { font: inherit; }
 button { cursor: pointer; }
+a { color: var(--accent); }
 
 .app-shell {
   min-height: 100vh;
@@ -30,7 +31,7 @@ button { cursor: pointer; }
 .app-header h1 { margin: 0; font-size: 1.25rem; }
 .page h2 { margin-top: 0; }
 .muted { color: var(--muted); }
-.panel { border: 1px solid var(--border); border-radius: .75rem; padding: 1rem; }
+.panel { border: 1px solid var(--border); border-radius: .75rem; padding: 1rem; margin-bottom: 1rem; }
 
 .app-nav {
   position: sticky;
@@ -83,6 +84,28 @@ button { cursor: pointer; }
 .summary-panel { text-align: center; }
 .summary-score { font-size: 1.25rem; font-weight: 700; }
 .summary-panel .actions { justify-content: center; }
+
+.button-link {
+  display: inline-block;
+  margin-top: .75rem;
+  padding: .7rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: .5rem;
+  text-decoration: none;
+}
+.back-link { display: inline-block; margin-bottom: 1rem; }
+.diagnostic-panel h3 { margin-top: 0; }
+.diagnostic-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .55rem 0;
+  border-top: 1px solid var(--border);
+}
+.diagnostic-row:first-of-type { border-top: 0; }
+.diagnostic-row strong { text-align: right; }
+.diagnostic-row.ok strong { color: var(--success); }
+.diagnostic-row.bad strong { color: var(--danger); }
 
 @media (min-width: 36rem) {
   .type-grid { grid-template-columns: repeat(6, 1fr); }
