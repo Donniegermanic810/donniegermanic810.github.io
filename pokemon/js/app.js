@@ -1,7 +1,10 @@
 import { startRouter } from './router.js';
-import { state } from './state.js';
+import { state, hydratePersistentState } from './state.js';
+import { loadPersistentData } from './storage.js';
 import { VIEWS } from './views.js';
 import { runEngineSelfTests } from './engine/effectiveness.js';
+
+hydratePersistentState(loadPersistentData());
 
 const viewRoot = document.querySelector('#app-view');
 const navLinks = [...document.querySelectorAll('[data-route]')];
