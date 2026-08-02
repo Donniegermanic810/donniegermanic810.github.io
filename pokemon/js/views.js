@@ -1,6 +1,8 @@
-import { TYPES, TYPE_META } from './data/types.js';
-import { state, resetQuestionState } from './state.js';
-import { getQuizMode, QUIZ_MODES } from './quiz/modes.js';
+import { TYPE_META } from './data/types.js';
+import { state, resetQuestionState, getAverageScore } from './state.js';
+import { createQuestionForMode, QUIZ_MODES } from './quiz/modes.js';
+import { scoreQuestion } from './quiz/scoring.js';
+import { renderAnswerDisplay } from './quiz/displays.js';
 
 function el(tag, options = {}) {
   const node = document.createElement(tag);
@@ -9,11 +11,40 @@ function el(tag, options = {}) {
   return node;
 }
 
+function formatPercent(score) {
+  return `${Math.round(score * 100)}%`;
+}
+
+function formatTypes(types) {
+  return types.length
+    ? types.map(type => TYPE_META[type].label).join(', ')
+    : 'None';
+}
+
 function newQuestion(render) {
   resetQuestionState();
   state.quiz.status = 'answering';
-  state.quiz.question = getQuizMode(state.quiz.mode).createQuestion();
+  state.quiz.question = createQuestionForMode(state.quiz.mode);
   render();
+}
+
+function toggleAnswer(answer, render) {
+  if (state.quiz.selectedAnswers.has(answer)) {
+    state.quiz.selectedAnswers.delete(answer);
+  } else {
+    state.quiz.selectedAnswers.add(answer);
+  }
+  render();
+}
+
+function renderFeedback(result, question) {
+  const feedback = el('div', { className: 'feedback' });
+  feedback.append(el('h4', { text: `Question score: ${formatPercent(result.score)}` }));
+  feedback.append(el('p', { text: `Correctly selected: ${formatTypes(result.correctlySelected)}` }));
+  feedback.append(el('p', { text: `Missed: ${formatTypes(result.missedAnswers)}` }));
+  feedback.append(el('p', { text: `Incorrectly selected: ${formatTypes(result.incorrectAnswers)}` }));
+  feedback.append(el('p', { className: 'muted', text: question.explanation }));
+  return feedback;
 }
 
 function renderQuiz(container, render) {
@@ -42,7 +73,9 @@ function renderQuiz(container, render) {
 
   if (!state.quiz.question) {
     const panel = el('div', { className: 'panel' });
-    panel.append(el('p', { text: 'One quiz mode is registered. More modes can be added without changing the quiz page.' }));
+    panel.append(el('p', {
+      text: 'This quiz mode currently uses one offensive weakness generator. Additional generators can be added to the mode later.'
+    }));
     const start = el('button', { text: 'Start quiz' });
     start.addEventListener('click', () => newQuestion(render));
     panel.append(start);
@@ -55,45 +88,26 @@ function renderQuiz(container, render) {
   const panel = el('div', { className: 'panel' });
   panel.append(el('h3', { text: question.prompt }));
 
-  const grid = el('div', { className: 'type-grid' });
-  for (const type of TYPES) {
-    const button = el('button', { className: 'type-button', text: TYPE_META[type].label });
-    button.type = 'button';
-    button.dataset.type = type;
-    button.setAttribute('aria-pressed', String(state.quiz.selectedTypes.has(type)));
-    if (state.quiz.result) {
-      if (question.correctTypes.includes(type)) button.classList.add('correct');
-      else if (state.quiz.selectedTypes.has(type)) button.classList.add('incorrect');
-      button.disabled = true;
-    } else {
-      button.addEventListener('click', () => {
-        state.quiz.selectedTypes.has(type) ? state.quiz.selectedTypes.delete(type) : state.quiz.selectedTypes.add(type);
-        render();
-      });
-    }
-    grid.append(button);
-  }
-  panel.append(grid);
+  panel.append(renderAnswerDisplay(question.answerType, {
+    question,
+    selectedAnswers: state.quiz.selectedAnswers,
+    result: state.quiz.result,
+    onToggle: answer => toggleAnswer(answer, render)
+  }));
 
   if (state.quiz.result) {
-    const feedback = el('div', {
-      className: `feedback ${state.quiz.result.isCorrect ? 'correct' : 'incorrect'}`,
-      text: state.quiz.result.isCorrect
-        ? 'Correct.'
-        : `Incorrect. Correct answers: ${state.quiz.result.correctTypes.map(type => TYPE_META[type].label).join(', ')}.`
-    });
-    panel.append(feedback);
+    panel.append(renderFeedback(state.quiz.result, question));
   }
 
   const actions = el('div', { className: 'actions' });
   if (!state.quiz.result) {
     const submit = el('button', { text: 'Submit answer' });
-    submit.disabled = state.quiz.selectedTypes.size === 0;
+    submit.disabled = state.quiz.selectedAnswers.size === 0;
     submit.addEventListener('click', () => {
-      state.quiz.result = getQuizMode(state.quiz.mode).evaluate(question, state.quiz.selectedTypes);
+      state.quiz.result = scoreQuestion(question, state.quiz.selectedAnswers);
       state.quiz.status = 'answered';
       state.progress.totalAnswered += 1;
-      if (state.quiz.result.isCorrect) state.progress.totalCorrect += 1;
+      state.progress.totalScore += state.quiz.result.score;
       render();
     });
     actions.append(submit);
@@ -119,6 +133,10 @@ function renderPlaceholder(container, title, message) {
 export const VIEWS = {
   quiz: renderQuiz,
   study: container => renderPlaceholder(container, 'Study', 'Type and Pokémon lookup will live here.'),
-  progress: container => renderPlaceholder(container, 'Progress', `Answered this session: ${state.progress.totalAnswered}. Correct: ${state.progress.totalCorrect}.`),
+  progress: container => renderPlaceholder(
+    container,
+    'Progress',
+    `Answered this session: ${state.progress.totalAnswered}. Average score: ${formatPercent(getAverageScore())}.`
+  ),
   settings: container => renderPlaceholder(container, 'Settings', 'Persistent quiz and display settings will live here.')
 };
