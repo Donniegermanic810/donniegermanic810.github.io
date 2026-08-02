@@ -7,6 +7,7 @@ export const state = {
     selectedAnswers: new Set(),
     result: null,
     session: {
+      mode: 'select-all',
       length: 10,
       questionNumber: 0,
       totalScore: 0,
@@ -15,8 +16,15 @@ export const state = {
   },
   settings: {
     theme: 'system',
-    quizMode: 'select-all',
-    quizLength: 10
+    quiz: {
+      defaultMode: 'select-all',
+      common: {},
+      modes: {
+        'select-all': {
+          questionCount: 10
+        }
+      }
+    }
   },
   study: { selectedType: null },
   progress: {
@@ -29,18 +37,43 @@ export const state = {
   }
 };
 
+export function getQuizModeSettings(modeId = state.quiz.mode) {
+  if (!state.settings.quiz.modes[modeId]) {
+    state.settings.quiz.modes[modeId] = { questionCount: 10 };
+  }
+  return state.settings.quiz.modes[modeId];
+}
+
 export function hydratePersistentState(persistentData) {
-  state.settings = { ...state.settings, ...persistentData.settings };
+  state.settings = {
+    ...state.settings,
+    ...persistentData.settings,
+    quiz: {
+      ...state.settings.quiz,
+      ...persistentData.settings.quiz,
+      common: { ...persistentData.settings.quiz.common },
+      modes: structuredClone(persistentData.settings.quiz.modes)
+    }
+  };
   state.progress = { ...state.progress, ...persistentData.progress };
   state.cache = { ...state.cache, ...persistentData.cache };
 
-  state.quiz.mode = state.settings.quizMode;
-  state.quiz.session.length = state.settings.quizLength;
+  state.quiz.mode = state.settings.quiz.defaultMode;
+  const modeSettings = getQuizModeSettings(state.quiz.mode);
+  state.quiz.session.mode = state.quiz.mode;
+  state.quiz.session.length = modeSettings.questionCount;
 }
 
 export function getPersistentSnapshot() {
   return {
-    settings: { ...state.settings },
+    settings: {
+      theme: state.settings.theme,
+      quiz: {
+        defaultMode: state.settings.quiz.defaultMode,
+        common: { ...state.settings.quiz.common },
+        modes: structuredClone(state.settings.quiz.modes)
+      }
+    },
     progress: {
       ...state.progress,
       relationshipStats: { ...state.progress.relationshipStats }
@@ -57,10 +90,13 @@ export function resetQuestionState() {
   state.quiz.question = null;
 }
 
-export function startQuizSession(length = state.settings.quizLength) {
-  state.settings.quizLength = length;
+export function startQuizSession(length = getQuizModeSettings().questionCount) {
+  const modeSettings = getQuizModeSettings();
+  modeSettings.questionCount = length;
+  state.settings.quiz.defaultMode = state.quiz.mode;
   state.quiz.status = 'answering';
   state.quiz.session = {
+    mode: state.quiz.mode,
     length,
     questionNumber: 1,
     totalScore: 0,
