@@ -19,9 +19,15 @@ export function runEngineSelfTests() {
     ['ice', ['fire', 'steel'], .25],
     ['electric', ['water', 'flying'], 4]
   ];
-  return cases.map(([attack, defend, expected]) => ({
-    attack, defend, expected,
-    actual: getMultiplier(attack, defend),
-    passed: getMultiplier(attack, defend) === expected
-  }));
+  return cases.map(([attack, defend, expected]) => {
+    const actual = getMultiplier(attack, defend);
+    return {
+      name: `${attack} → ${defend.join('/')}: expected ${expected}×`,
+      attack,
+      defend,
+      expected,
+      actual,
+      passed: actual === expected
+    };
+  });
 }
