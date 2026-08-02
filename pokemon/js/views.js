@@ -1,4 +1,4 @@
-import { TYPE_META } from './data/types.js';
+import { TYPES, TYPE_META } from './data/types.js';
 import {
   state,
   getQuizModeSettings,
@@ -10,10 +10,12 @@ import {
   getSessionAverageScore,
   getAverageScore
 } from './state.js';
-import { saveSettings, saveProgress } from './storage.js';
+import { saveSettings, saveProgress, loadPersistentData, STORAGE_VERSION } from './storage.js';
 import { createQuestionForMode, QUIZ_MODES } from './quiz/modes.js';
+import { QUESTION_GENERATORS } from './quiz/generators.js';
 import { scoreQuestion } from './quiz/scoring.js';
 import { renderAnswerDisplay } from './quiz/displays.js';
+import { runEngineSelfTests } from './engine/effectiveness.js';
 
 function el(tag, options = {}) {
   const node = document.createElement(tag);
@@ -68,7 +70,7 @@ function renderFeedback(result, question) {
 function renderQuizSetup(page, render) {
   const panel = el('div', { className: 'panel' });
   panel.append(el('p', {
-    text: 'This quiz currently uses one offensive weakness generator. Each quiz type now keeps its own saved setup.'
+    text: 'This quiz currently uses one offensive weakness generator. Each quiz type keeps its own saved setup.'
   }));
 
   const form = el('div', { className: 'quiz-setup' });
@@ -156,9 +158,7 @@ function renderActiveQuestion(page, render) {
     onToggle: answer => toggleAnswer(answer, render)
   }));
 
-  if (state.quiz.result) {
-    panel.append(renderFeedback(state.quiz.result, question));
-  }
+  if (state.quiz.result) panel.append(renderFeedback(state.quiz.result, question));
 
   const actions = el('div', { className: 'actions' });
   if (!state.quiz.result) {
@@ -226,13 +226,9 @@ function renderQuiz(container, render) {
   const page = el('section', { className: 'page' });
   page.append(el('h2', { text: 'Quiz' }));
 
-  if (state.quiz.status === 'idle') {
-    renderQuizSetup(page, render);
-  } else if (state.quiz.status === 'complete') {
-    renderSessionSummary(page, render);
-  } else {
-    renderActiveQuestion(page, render);
-  }
+  if (state.quiz.status === 'idle') renderQuizSetup(page, render);
+  else if (state.quiz.status === 'complete') renderSessionSummary(page, render);
+  else renderActiveQuestion(page, render);
 
   container.replaceChildren(page);
 }
@@ -246,6 +242,91 @@ function renderPlaceholder(container, title, message) {
   container.replaceChildren(page);
 }
 
+function renderSettings(container) {
+  const page = el('section', { className: 'page' });
+  page.append(el('h2', { text: 'Settings' }));
+
+  const panel = el('div', { className: 'panel' });
+  panel.append(el('p', {
+    text: `Saved preferences are active. Theme preference: ${state.settings.theme}. Default quiz type: ${state.settings.quiz.defaultMode}.`
+  }));
+  const link = el('a', { className: 'button-link', text: 'Developer diagnostics' });
+  link.href = '#debug';
+  panel.append(link);
+  page.append(panel);
+  container.replaceChildren(page);
+}
+
+function diagnosticRow(label, value, status = 'neutral') {
+  const row = el('div', { className: `diagnostic-row ${status}` });
+  row.append(el('span', { text: label }));
+  row.append(el('strong', { text: String(value) }));
+  return row;
+}
+
+function localStorageAvailable() {
+  try {
+    const key = '__pokemon_debug_test__';
+    localStorage.setItem(key, '1');
+    localStorage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function renderDebug(container) {
+  const page = el('section', { className: 'page' });
+  page.append(el('h2', { text: 'Developer diagnostics' }));
+  const back = el('a', { className: 'back-link', text: '← Back to settings' });
+  back.href = '#settings';
+  page.append(back);
+
+  const tests = runEngineSelfTests();
+  const passed = tests.filter(test => test.passed).length;
+  const saved = loadPersistentData();
+  const storageWorks = localStorageAvailable();
+
+  const overview = el('div', { className: 'panel diagnostic-panel' });
+  overview.append(el('h3', { text: 'System' }));
+  overview.append(diagnosticRow('Type chart loaded', TYPES.length === 18 ? 'Yes' : 'No', TYPES.length === 18 ? 'ok' : 'bad'));
+  overview.append(diagnosticRow('Types', TYPES.length, TYPES.length === 18 ? 'ok' : 'bad'));
+  overview.append(diagnosticRow('Single-type relationships', TYPES.length * TYPES.length, 'ok'));
+  overview.append(diagnosticRow('Engine tests', `${passed}/${tests.length} passed`, passed === tests.length ? 'ok' : 'bad'));
+  overview.append(diagnosticRow('Registered quiz modes', Object.keys(QUIZ_MODES).length, 'ok'));
+  overview.append(diagnosticRow('Registered generators', Object.keys(QUESTION_GENERATORS).length, 'ok'));
+  page.append(overview);
+
+  const storage = el('div', { className: 'panel diagnostic-panel' });
+  storage.append(el('h3', { text: 'Storage' }));
+  storage.append(diagnosticRow('localStorage available', storageWorks ? 'Yes' : 'No', storageWorks ? 'ok' : 'bad'));
+  storage.append(diagnosticRow('Schema version', STORAGE_VERSION, 'ok'));
+  storage.append(diagnosticRow('Saved questions', saved.progress.totalAnswered, 'neutral'));
+  storage.append(diagnosticRow('Saved average', formatPercent(saved.progress.totalAnswered ? saved.progress.totalScore / saved.progress.totalAnswered : 0), 'neutral'));
+  storage.append(diagnosticRow('Relationship records', Object.keys(saved.progress.relationshipStats ?? {}).length, 'neutral'));
+  storage.append(diagnosticRow('Cached Pokémon', Object.keys(saved.cache.pokemon ?? {}).length, 'neutral'));
+  page.append(storage);
+
+  const runtime = el('div', { className: 'panel diagnostic-panel' });
+  runtime.append(el('h3', { text: 'Runtime state' }));
+  runtime.append(diagnosticRow('Current route', state.route));
+  runtime.append(diagnosticRow('Quiz status', state.quiz.status));
+  runtime.append(diagnosticRow('Selected quiz mode', state.quiz.mode));
+  runtime.append(diagnosticRow('Active session mode', state.quiz.session.mode));
+  runtime.append(diagnosticRow('Active session length', state.quiz.session.length === 0 ? 'Endless' : state.quiz.session.length));
+  runtime.append(diagnosticRow('Current selections', state.quiz.selectedAnswers.size));
+  page.append(runtime);
+
+  const testPanel = el('div', { className: 'panel diagnostic-panel' });
+  testPanel.append(el('h3', { text: 'Engine test details' }));
+  for (const test of tests) {
+    testPanel.append(diagnosticRow(test.name ?? 'Unnamed test', test.passed ? 'Pass' : 'Fail', test.passed ? 'ok' : 'bad'));
+  }
+  page.append(testPanel);
+
+  container.replaceChildren(page);
+}
+
 export const VIEWS = {
   quiz: renderQuiz,
   study: container => renderPlaceholder(container, 'Study', 'Type and Pokémon lookup will live here.'),
@@ -254,9 +335,6 @@ export const VIEWS = {
     'Progress',
     `Saved questions answered: ${state.progress.totalAnswered}. Average score: ${formatPercent(getAverageScore())}.`
   ),
-  settings: container => renderPlaceholder(
-    container,
-    'Settings',
-    `Saved preferences are active. Theme preference: ${state.settings.theme}. Default quiz type: ${state.settings.quiz.defaultMode}.`
-  )
+  settings: renderSettings,
+  debug: renderDebug
 };
